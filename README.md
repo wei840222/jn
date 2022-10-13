@@ -23,10 +23,10 @@ A server run javascript with input and output the results.
 
 ## How to build?
 ```bash
-pack build --builder=gcr.io/buildpacks/builder:v1 --publish wei840222/jsrun:9
+pack build --builder=gcr.io/buildpacks/builder:v1 --publish wei840222/jsrun:10
 ```
 
 ## How to deploy?
 ```bash
-kn ksvc apply --image=wei840222/jsrun:9 jsrun
+kn ksvc apply --image=wei840222/jsrun:10 jsrun
 ```

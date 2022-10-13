@@ -1,7 +1,7 @@
 [project]
 id = "github.com/wei840222/jsrun"
 name = "jsrun"
-version = "1.0.0"
+version = "0.1.0"
 authors = [
     "wei840222@gmail.com"
 ]

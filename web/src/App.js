@@ -13,6 +13,7 @@ class App extends React.Component {
       script: 'const result = data;\n[result].map(item => item.a);',
       data: JSON.stringify({ a: "cccc" }, null, 2),
     }
+    this.resultFormatterReference = React.createRef();
     this.resultFormatter = new JSONFormatter('Click Run button to run script...', Infinity, {
       hoverPreviewEnabled: true,
       hoverPreviewArrayCount: 100,
@@ -24,8 +25,6 @@ class App extends React.Component {
       maxArrayItems: 100,
       exposePath: false
     });
-    this.isResultFormatterMount = false
-    this.resultFormatterReference = React.createRef();
   }
 
   componentDidMount() {
@@ -37,10 +36,8 @@ class App extends React.Component {
     if (data) {
       this.setState({ data });
     }
-    if (!this.isResultFormatterMount) {
-      this.resultFormatterReference.current.appendChild(this.resultFormatter.render());
-      this.isResultFormatterMount = true
-    }
+    this.resultFormatterReference.current.innerHTML = '';
+    this.resultFormatterReference.current.appendChild(this.resultFormatter.render());
   }
 
   handleChange(event) {
@@ -68,6 +65,8 @@ class App extends React.Component {
     });
     const body = await response.json();
     this.resultFormatter.json = body
+    this.resultFormatterReference.current.innerHTML = '';
+    this.resultFormatterReference.current.appendChild(this.resultFormatter.render());
   }
 
   render() {
