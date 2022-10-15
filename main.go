@@ -59,7 +59,9 @@ func jsrun(c *gin.Context) {
 	data, _ := readMultipartFile(c, "data")
 	script, err := readMultipartFile(c, "script")
 	if err != nil {
-		panic(err)
+		c.Error(err)
+		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
 	concurrencyLimiter <- struct{}{}
@@ -88,6 +90,7 @@ func jsrun(c *gin.Context) {
 	result, err := ctx.RunScript(script, "script.js")
 	if err != nil {
 		if jsErr, ok := err.(*v8go.JSError); ok {
+			c.Error(err)
 			c.AbortWithStatusJSON(http.StatusOK, gin.H{
 				"error":      jsErr.Message,
 				"source":     jsErr.Location,
