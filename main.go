@@ -21,33 +21,6 @@ func init() {
 	rateLimiter = ratelimit.New(1000)
 }
 
-func runJs(data string, script string) (*v8go.Value, error) {
-	concurrencyLimiter <- struct{}{}
-	defer func() {
-		<-concurrencyLimiter
-	}()
-
-	rateLimiter.Take()
-
-	ctx := v8go.NewContext(v8Isolate)
-	defer ctx.Close()
-
-	if data != "" {
-		global := ctx.Global()
-		if dataValue, err := v8go.JSONParse(ctx, data); err != nil {
-			if err := global.Set("data", data); err != nil {
-				return nil, err
-			}
-		} else {
-			if err := global.Set("data", dataValue); err != nil {
-				return nil, err
-			}
-		}
-	}
-
-	return ctx.RunScript(script, "script.js")
-}
-
 func readMultipartFile(c *gin.Context, key string) (string, error) {
 	fileHeader, err := c.FormFile(key)
 	if err != nil {
@@ -65,7 +38,17 @@ func readMultipartFile(c *gin.Context, key string) (string, error) {
 }
 
 func ping(c *gin.Context) {
-	result, err := runJs("", `const message = 'pong'; message;`)
+	concurrencyLimiter <- struct{}{}
+	defer func() {
+		<-concurrencyLimiter
+	}()
+
+	rateLimiter.Take()
+
+	ctx := v8go.NewContext(v8Isolate)
+	defer ctx.Close()
+
+	result, err := ctx.RunScript(`const message = 'pong'; message;`, "script.js")
 	if err != nil {
 		panic(err)
 	}
@@ -79,7 +62,30 @@ func jsrun(c *gin.Context) {
 		panic(err)
 	}
 
-	result, err := runJs(data, script)
+	concurrencyLimiter <- struct{}{}
+	defer func() {
+		<-concurrencyLimiter
+	}()
+
+	rateLimiter.Take()
+
+	ctx := v8go.NewContext(v8Isolate)
+	defer ctx.Close()
+
+	if data != "" {
+		global := ctx.Global()
+		if dataValue, err := v8go.JSONParse(ctx, data); err != nil {
+			if err := global.Set("data", data); err != nil {
+				panic(err)
+			}
+		} else {
+			if err := global.Set("data", dataValue); err != nil {
+				panic(err)
+			}
+		}
+	}
+
+	result, err := ctx.RunScript(script, "script.js")
 	if err != nil {
 		if jsErr, ok := err.(*v8go.JSError); ok {
 			c.AbortWithStatusJSON(http.StatusOK, gin.H{
