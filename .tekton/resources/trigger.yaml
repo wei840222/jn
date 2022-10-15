@@ -38,7 +38,7 @@ spec:
         metadata:
           generateName: jsrun-
         spec:
-          serviceAccountName: source-code-to-url
+          serviceAccountName: kn-apply
           pipelineRef:
             name: source-code-to-url
           params:

@@ -6,10 +6,4 @@ configurations:
 - ./configurations/tekton-namereferences.yaml
 resources:
 - ./resources/pipeline.yaml
-- ./resources/rbac.yaml
 - ./resources/trigger.yaml
-secretGenerator:
-- name: docker-credentials
-  type: Opaque
-  files:
-  - config.json=./configs/docker.json
