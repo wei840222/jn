@@ -1,29 +1,71 @@
 package main
 
 import (
-	"encoding/json"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/ratelimit"
 	"rogchap.com/v8go"
 )
 
-var v8Iso *v8go.Isolate
-var limiter chan struct{}
+var (
+	v8Isolate          *v8go.Isolate
+	concurrencyLimiter chan struct{}
+	rateLimiter        ratelimit.Limiter
+)
 
 func init() {
-	v8Iso = v8go.NewIsolate()
-	limiter = make(chan struct{}, 2)
+	v8Isolate = v8go.NewIsolate()
+	concurrencyLimiter = make(chan struct{}, 10)
+	rateLimiter = ratelimit.New(1000)
+}
+
+func runJs(data string, script string) (*v8go.Value, error) {
+	concurrencyLimiter <- struct{}{}
+	defer func() {
+		<-concurrencyLimiter
+	}()
+
+	rateLimiter.Take()
+
+	ctx := v8go.NewContext(v8Isolate)
+	defer ctx.Close()
+
+	if data != "" {
+		global := ctx.Global()
+		if dataValue, err := v8go.JSONParse(ctx, data); err != nil {
+			if err := global.Set("data", data); err != nil {
+				return nil, err
+			}
+		} else {
+			if err := global.Set("data", dataValue); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	return ctx.RunScript(script, "script.js")
+}
+
+func readMultipartFile(c *gin.Context, key string) (string, error) {
+	fileHeader, err := c.FormFile(key)
+	if err != nil {
+		return "", err
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	b, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func ping(c *gin.Context) {
-	limiter <- struct{}{}
-	defer func() {
-		<-limiter
-	}()
-	ctx := v8go.NewContext(v8Iso)
-	defer ctx.Close()
-	result, err := ctx.RunScript(`const message = 'pong'; message;`, "script.js")
+	result, err := runJs("", `const message = 'pong'; message;`)
 	if err != nil {
 		panic(err)
 	}
@@ -31,59 +73,35 @@ func ping(c *gin.Context) {
 }
 
 func jsrun(c *gin.Context) {
-	limiter <- struct{}{}
-	defer func() {
-		<-limiter
-	}()
-	var request struct {
-		Script string `json:"script" binding:"required"`
-		Data   any    `json:"data"`
+	data, _ := readMultipartFile(c, "data")
+	script, err := readMultipartFile(c, "script")
+	if err != nil {
+		panic(err)
 	}
-	if err := c.Bind(&request); err != nil {
-		if err != nil {
-			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
+
+	result, err := runJs(data, script)
+	if err != nil {
+		if jsErr, ok := err.(*v8go.JSError); ok {
+			c.AbortWithStatusJSON(http.StatusOK, gin.H{
+				"error":      jsErr.Message,
+				"source":     jsErr.Location,
+				"stackTrace": jsErr.StackTrace,
 			})
 			return
 		}
-	}
-
-	ctx := v8go.NewContext(v8Iso)
-	defer ctx.Close()
-
-	if request.Data != nil {
-		global := ctx.Global()
-		b, err := json.Marshal(request.Data)
-		if err != nil {
-			panic(err)
-		}
-		if err := global.Set("data", string(b)); err != nil {
-			panic(err)
-		}
-	}
-
-	if _, err := ctx.RunScript("try{data=JSON.parse(data)}catch{}", "parse.js"); err != nil {
 		panic(err)
 	}
-	result, err := ctx.RunScript(request.Script, "main.js")
-	if err != nil {
-		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{
-			"error": err.Error(),
-		})
+	if result.IsObject() {
+		c.JSON(http.StatusOK, result.Object())
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"result": result.Object(),
-	})
+	c.String(http.StatusOK, result.String())
 }
 
 func main() {
-	defer v8Iso.Dispose()
+	defer v8Isolate.Dispose()
 	r := gin.Default()
+	r.GET("/", ping)
 	r.POST("/", jsrun)
-	r.GET("/ping", ping)
 	r.Run()
 }
