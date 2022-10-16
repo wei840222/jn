@@ -30,3 +30,8 @@ pack build --builder=gcr.io/buildpacks/builder:v1 --publish wei840222/jsrun:10
 ```bash
 kn ksvc apply --image=wei840222/jsrun:10 jsrun
 ```
+
+## How to deploy by tekton?
+```bash
+kubectl apply -k .tekton
+```
