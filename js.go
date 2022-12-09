@@ -54,11 +54,12 @@ func (h *jsHandler) invoke(c *gin.Context) {
 
 	span.AddEvent("script", trace.WithAttributes(attribute.String("script", req.Script)))
 
-	ctx := v8.NewContext(h.v8Iso)
-	defer ctx.Close()
+	v8Ctx := v8.NewContext(h.v8Iso)
+	defer v8Ctx.Close()
 
+	_, sspan := tracer.Start(c, "try set data to v8 global variable")
 	if req.Data != nil {
-		global := ctx.Global()
+		global := v8Ctx.Global()
 		if s, ok := req.Data.(string); ok {
 			span.AddEvent("data", trace.WithAttributes(attribute.String("data", s)))
 			if err := global.Set("data", s); err != nil {
@@ -76,11 +77,12 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		}
 	}
 
-	if _, err := ctx.RunScript("try { data = JSON.parse(data) } catch {}", "parse.js"); err != nil {
+	if _, err := v8Ctx.RunScript("try { data = JSON.parse(data) } catch {}", "parse.js"); err != nil {
 		panic(err)
 	}
+	sspan.End()
 
-	_, sspan := tracer.Start(c, "Load JavaScript Library")
+	_, sspan = tracer.Start(c, "load javascript library")
 	if err := fs.WalkDir(jslib, ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -97,10 +99,10 @@ func (h *jsHandler) invoke(c *gin.Context) {
 			if err != nil {
 				return err
 			}
-			if _, err := ctx.RunScript(string(b), info.Name()); err != nil {
+			if _, err := v8Ctx.RunScript(string(b), info.Name()); err != nil {
 				return err
 			}
-			sspan.AddEvent("load jslib", trace.WithAttributes(attribute.String("name", info.Name())))
+			sspan.AddEvent("load " + info.Name())
 		}
 		return nil
 	}); err != nil {
@@ -108,8 +110,8 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	}
 	sspan.End()
 
-	_, sspan = tracer.Start(c, "Run JavaScript")
-	result, err := ctx.RunScript(req.Script, "script.js")
+	_, sspan = tracer.Start(c, "run javascript")
+	result, err := v8Ctx.RunScript(req.Script, "script.js")
 	if err != nil {
 		if jsErr, ok := err.(*v8.JSError); ok {
 			c.Error(err)
@@ -118,6 +120,11 @@ func (h *jsHandler) invoke(c *gin.Context) {
 				"source":     jsErr.Location,
 				"stackTrace": jsErr.StackTrace,
 			})
+			sspan.RecordError(err, trace.WithAttributes(
+				attribute.String("error", jsErr.Message),
+				attribute.String("source", jsErr.Location),
+				attribute.String("stackTrace", jsErr.StackTrace),
+			))
 			return
 		}
 		panic(err)
