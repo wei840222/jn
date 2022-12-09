@@ -1,4 +1,4 @@
-module github.com/wei840222/jsrun
+module github.com/wei840222/jn
 
 go 1.19
 

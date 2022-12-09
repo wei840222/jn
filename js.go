@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/ratelimit"
 	v8 "rogchap.com/v8go"
@@ -35,6 +37,9 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	done := h.allowLimit()
 	defer done()
 
+	span := trace.SpanFromContext(c)
+	span.AddEvent("allowLimit", trace.WithAttributes(attribute.Int("concurrency", len(h.cl))))
+
 	var req struct {
 		Script string `json:"script" binding:"required"`
 		Data   any    `json:"data"`
@@ -47,12 +52,15 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		return
 	}
 
+	span.AddEvent("script", trace.WithAttributes(attribute.String("script", req.Script)))
+
 	ctx := v8.NewContext(h.v8Iso)
 	defer ctx.Close()
 
 	if req.Data != nil {
 		global := ctx.Global()
 		if s, ok := req.Data.(string); ok {
+			span.AddEvent("data", trace.WithAttributes(attribute.String("data", s)))
 			if err := global.Set("data", s); err != nil {
 				panic(err)
 			}
@@ -61,6 +69,7 @@ func (h *jsHandler) invoke(c *gin.Context) {
 			if err != nil {
 				panic(err)
 			}
+			span.AddEvent("data", trace.WithAttributes(attribute.String("data", string(b))))
 			if err := global.Set("data", string(b)); err != nil {
 				panic(err)
 			}
@@ -71,6 +80,7 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		panic(err)
 	}
 
+	_, sspan := tracer.Start(c, "Load JavaScript Library")
 	if err := fs.WalkDir(jslib, ".", func(path string, entry fs.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -90,12 +100,15 @@ func (h *jsHandler) invoke(c *gin.Context) {
 			if _, err := ctx.RunScript(string(b), info.Name()); err != nil {
 				return err
 			}
+			sspan.AddEvent("load jslib", trace.WithAttributes(attribute.String("name", info.Name())))
 		}
 		return nil
 	}); err != nil {
 		panic(err)
 	}
+	sspan.End()
 
+	_, sspan = tracer.Start(c, "Run JavaScript")
 	result, err := ctx.RunScript(req.Script, "script.js")
 	if err != nil {
 		if jsErr, ok := err.(*v8.JSError); ok {
@@ -109,6 +122,7 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		}
 		panic(err)
 	}
+	sspan.End()
 
 	if result.IsNullOrUndefined() {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{
