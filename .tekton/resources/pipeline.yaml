@@ -74,5 +74,8 @@ spec:
       - ksvc
       - apply
       - --namespace=$(params.application-namespace)
+      - --annotation=prometheus.io/scrape=true
+      - --annotation=prometheus.io/port=2222
+      - --annotation=instrumentation.opentelemetry.io/inject-sdk=true
       - --image=$(params.image-registry-url):$(tasks.image-tag.results.tag)
       - $(params.application-name)
