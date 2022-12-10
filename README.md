@@ -24,6 +24,7 @@ kubectl apply -k .tekton
 ```
 
 ## Example Usage
+### js
 ```bash
 # json
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
@@ -54,8 +55,8 @@ curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' http://localhost:80
 }
 ```
 
-## Embaded some JavaScript Libraries
-### Lodash
+#### Embaded some JavaScript Libraries
+##### Lodash
 https://lodash.com
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
@@ -82,7 +83,7 @@ curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke
 }
 ```
 
-### Moment.js
+##### Moment.js
 https://momentjs.com
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
@@ -96,7 +97,7 @@ curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke
 }
 ```
 
-### base64.js
+##### base64.js
 https://github.com/mathiasbynens/base64
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \

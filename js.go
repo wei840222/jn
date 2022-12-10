@@ -10,6 +10,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric/instrument"
+	"go.opentelemetry.io/otel/metric/instrument/syncint64"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/ratelimit"
@@ -31,6 +33,8 @@ type jsHandler struct {
 	jslibs []*jsLibrary
 	cl     chan struct{}
 	rl     ratelimit.Limiter
+
+	jsInvokeConcurrencyMetrics syncint64.UpDownCounter
 }
 
 func (h *jsHandler) allowLimit() func() {
@@ -46,6 +50,8 @@ func (h *jsHandler) invoke(c *gin.Context) {
 
 	done := h.allowLimit()
 	defer done()
+	h.jsInvokeConcurrencyMetrics.Add(c, 1)
+	defer h.jsInvokeConcurrencyMetrics.Add(c, -1)
 	span.AddEvent("allowLimit", trace.WithAttributes(attribute.Int("concurrency", len(h.cl))))
 
 	var req struct {
@@ -152,11 +158,18 @@ func (h *jsHandler) invoke(c *gin.Context) {
 }
 
 func RegisterJSHandler(lc fx.Lifecycle, e *gin.Engine) error {
+	jsInvokeConcurrencyUpDownCounter, err := meter.SyncInt64().UpDownCounter("js_invoke_concurrency", instrument.WithDescription("Current concurrency of JavaScript invocation."))
+	if err != nil {
+		return err
+	}
+
 	h := &jsHandler{
 		v8Iso:  v8.NewIsolate(),
 		jslibs: make([]*jsLibrary, 0),
 		cl:     make(chan struct{}, 10),
 		rl:     ratelimit.New(1000),
+
+		jsInvokeConcurrencyMetrics: jsInvokeConcurrencyUpDownCounter,
 	}
 
 	e.POST("/invoke/js", h.invoke)

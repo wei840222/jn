@@ -18,13 +18,20 @@ import (
 	"go.uber.org/fx"
 )
 
-func InitMeterProvider(lc fx.Lifecycle) (metric.MeterProvider, *otelprom.Exporter, error) {
+var (
+	tracer trace.Tracer
+	meter  metric.Meter
+)
+
+func InitMeterProvider(lc fx.Lifecycle) (metric.MeterProvider, error) {
 	exporter, err := otelprom.New()
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(exporter))
+
+	meter = provider.Meter("github.com/wei840222/jn")
 
 	lc.Append(fx.Hook{
 		OnStop: func(ctx context.Context) error {
@@ -32,37 +39,35 @@ func InitMeterProvider(lc fx.Lifecycle) (metric.MeterProvider, *otelprom.Exporte
 		},
 	})
 
-	return provider, exporter, nil
+	return provider, nil
 }
 
 func InitTracerProvider(lc fx.Lifecycle) (trace.TracerProvider, error) {
-	var tp *sdktrace.TracerProvider
+	exporter := otlptrace.NewUnstarted(otlptracegrpc.NewClient())
+
+	provider := sdktrace.NewTracerProvider(
+		sdktrace.WithSampler(sdktrace.AlwaysSample()),
+		sdktrace.WithBatcher(exporter),
+		sdktrace.WithResource(resource.NewWithAttributes(
+			semconv.SchemaURL,
+			semconv.ServiceNameKey.String("jn"),
+			semconv.ServiceVersionKey.String("0.0.1"),
+		)),
+	)
+
+	tracer = provider.Tracer("github.com/wei840222/jn")
+
+	otel.SetTracerProvider(provider)
+	otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}, propagators_b3.New()))
 
 	lc.Append(fx.Hook{
 		OnStart: func(ctx context.Context) error {
-			exporter, err := otlptrace.New(ctx, otlptracegrpc.NewClient())
-			if err != nil {
-				return err
-			}
-
-			tp = sdktrace.NewTracerProvider(
-				sdktrace.WithSampler(sdktrace.AlwaysSample()),
-				sdktrace.WithBatcher(exporter),
-				sdktrace.WithResource(resource.NewWithAttributes(
-					semconv.SchemaURL,
-					semconv.ServiceNameKey.String("jn"),
-					semconv.ServiceVersionKey.String("0.0.1"),
-				)),
-			)
-
-			otel.SetTracerProvider(tp)
-			otel.SetTextMapPropagator(propagation.NewCompositeTextMapPropagator(propagation.TraceContext{}, propagation.Baggage{}, propagators_b3.New()))
-			return nil
+			return exporter.Start(ctx)
 		},
 		OnStop: func(ctx context.Context) error {
-			return tp.Shutdown(ctx)
+			return provider.Shutdown(ctx)
 		},
 	})
 
-	return otel.GetTracerProvider(), nil
+	return provider, nil
 }

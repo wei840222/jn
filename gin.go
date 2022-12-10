@@ -10,7 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	ginprom "github.com/wei840222/gin-prometheus"
 	"go.opentelemetry.io/contrib/instrumentation/github.com/gin-gonic/gin/otelgin"
-	otelprom "go.opentelemetry.io/otel/exporters/prometheus"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 )
@@ -58,12 +58,16 @@ func readMultipartTextOrFile(c *gin.Context, key string) (string, error) {
 	return string(b), nil
 }
 
-func InitGinEngine(lc fx.Lifecycle, tp trace.TracerProvider, otelpromExporter *otelprom.Exporter) *gin.Engine {
+func InitGinEngine(lc fx.Lifecycle, _ trace.TracerProvider, _ metric.MeterProvider) *gin.Engine {
 	gin.SetMode(gin.ReleaseMode)
 	e := gin.New()
 	e.ContextWithFallback = true
-	p := ginprom.NewPrometheus("gin").SetEnableExemplar(true).SetOtelPromExporter(otelpromExporter)
-	e.Use(otelgin.Middleware("gin", otelgin.WithTracerProvider(tp)), p.HandlerFunc(), gin.LoggerWithFormatter(ginOtelLogFormatter), gin.Recovery())
+	e.Use(
+		otelgin.Middleware("gin"),
+		ginprom.NewPrometheus("gin").SetEnableExemplar(true).SetListenAddress(":2222").SetMetricsPath(nil).HandlerFunc(),
+		gin.LoggerWithFormatter(ginOtelLogFormatter),
+		gin.Recovery(),
+	)
 
 	e.GET("/", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
@@ -76,7 +80,6 @@ func InitGinEngine(lc fx.Lifecycle, tp trace.TracerProvider, otelpromExporter *o
 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
-			p.SetListenAddress(":2222").SetMetricsPath(nil)
 			go func() {
 				if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 					panic(err)

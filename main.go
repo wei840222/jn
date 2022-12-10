@@ -2,13 +2,11 @@ package main
 
 import (
 	jsoniter "github.com/json-iterator/go"
-	"go.opentelemetry.io/otel"
 	"go.uber.org/fx"
 )
 
 var (
-	json   = jsoniter.ConfigCompatibleWithStandardLibrary
-	tracer = otel.Tracer("github.com/wei840222/jn")
+	json = jsoniter.ConfigCompatibleWithStandardLibrary
 )
 
 func main() {
