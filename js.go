@@ -16,13 +16,20 @@ import (
 	v8 "rogchap.com/v8go"
 )
 
-//go:embed jslib
+//go:embed third_party/js/*
 var jslib embed.FS
 
+type jsLibrary struct {
+	name          string
+	script        string
+	compilerCache *v8.CompilerCachedData
+}
+
 type jsHandler struct {
-	v8Iso *v8.Isolate
-	cl    chan struct{}
-	rl    ratelimit.Limiter
+	v8Iso  *v8.Isolate
+	jslibs []*jsLibrary
+	cl     chan struct{}
+	rl     ratelimit.Limiter
 }
 
 func (h *jsHandler) allowLimit() func() {
@@ -34,10 +41,10 @@ func (h *jsHandler) allowLimit() func() {
 }
 
 func (h *jsHandler) invoke(c *gin.Context) {
+	span := trace.SpanFromContext(c)
+
 	done := h.allowLimit()
 	defer done()
-
-	span := trace.SpanFromContext(c)
 	span.AddEvent("allowLimit", trace.WithAttributes(attribute.Int("concurrency", len(h.cl))))
 
 	var req struct {
@@ -64,7 +71,6 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		}
 		req.Script = script
 	}
-
 	span.AddEvent("script", trace.WithAttributes(attribute.String("script", req.Script)))
 
 	v8Ctx := v8.NewContext(h.v8Iso)
@@ -96,30 +102,15 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	sspan.End()
 
 	_, sspan = tracer.Start(c, "load javascript library")
-	if err := fs.WalkDir(jslib, ".", func(path string, entry fs.DirEntry, err error) error {
+	for _, jslib := range h.jslibs {
+		script, err := h.v8Iso.CompileUnboundScript(jslib.script, jslib.name, v8.CompileOptions{CachedData: jslib.compilerCache})
 		if err != nil {
-			return err
+			panic(err)
 		}
-		if entry.IsDir() {
-			return nil
+		if _, err = script.Run(v8Ctx); err != nil {
+			panic(err)
 		}
-		if strings.HasSuffix(path, ".js") {
-			b, err := os.ReadFile(path)
-			if err != nil {
-				return err
-			}
-			info, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if _, err := v8Ctx.RunScript(string(b), info.Name()); err != nil {
-				return err
-			}
-			sspan.AddEvent("load " + info.Name())
-		}
-		return nil
-	}); err != nil {
-		panic(err)
+		sspan.AddEvent("load " + jslib.name)
 	}
 	sspan.End()
 
@@ -165,14 +156,48 @@ func (h *jsHandler) invoke(c *gin.Context) {
 
 func RegisterJSHandler(lc fx.Lifecycle, e *gin.Engine) error {
 	h := &jsHandler{
-		v8Iso: v8.NewIsolate(),
-		cl:    make(chan struct{}, 10),
-		rl:    ratelimit.New(1000),
+		v8Iso:  v8.NewIsolate(),
+		jslibs: make([]*jsLibrary, 0),
+		cl:     make(chan struct{}, 10),
+		rl:     ratelimit.New(1000),
 	}
 
 	e.POST("/invoke/js", h.invoke)
 
 	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			v8Ctx := v8.NewContext(h.v8Iso)
+			defer v8Ctx.Close()
+			return fs.WalkDir(jslib, ".", func(path string, entry fs.DirEntry, err error) error {
+				if err != nil {
+					return err
+				}
+				if entry.IsDir() {
+					return nil
+				}
+				if strings.HasSuffix(path, ".js") {
+					b, err := os.ReadFile(path)
+					if err != nil {
+						return err
+					}
+					info, err := entry.Info()
+					if err != nil {
+						return err
+					}
+					script, err := h.v8Iso.CompileUnboundScript(string(b), info.Name(), v8.CompileOptions{})
+					if err != nil {
+						return err
+					}
+					script.Run(v8Ctx)
+					h.jslibs = append(h.jslibs, &jsLibrary{
+						name:          info.Name(),
+						script:        string(b),
+						compilerCache: script.CreateCodeCache(),
+					})
+				}
+				return nil
+			})
+		},
 		OnStop: func(context.Context) error {
 			h.v8Iso.Dispose()
 			return nil
