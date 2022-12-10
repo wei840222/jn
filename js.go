@@ -44,12 +44,25 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		Script string `json:"script" binding:"required"`
 		Data   any    `json:"data"`
 	}
-	if err := c.Bind(&req); err != nil {
-		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-			"error": err.Error(),
-		})
-		return
+	if strings.Contains(strings.ToLower(string(c.ContentType())), "application/json") {
+		if err := c.ShouldBind(&req); err != nil {
+			c.Error(err)
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+	} else {
+		req.Data, _ = readMultipartTextOrFile(c, "data")
+		script, err := readMultipartTextOrFile(c, "script")
+		if err != nil {
+			c.Error(err)
+			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
+				"error": err.Error(),
+			})
+			return
+		}
+		req.Script = script
 	}
 
 	span.AddEvent("script", trace.WithAttributes(attribute.String("script", req.Script)))

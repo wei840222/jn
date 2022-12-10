@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 
@@ -36,6 +37,25 @@ var ginOtelLogFormatter = func(param gin.LogFormatterParams) string {
 		trace.SpanContextFromContext(param.Request.Context()).TraceID(),
 		param.ErrorMessage,
 	)
+}
+
+func readMultipartTextOrFile(c *gin.Context, key string) (string, error) {
+	if text := c.PostForm(key); text != "" {
+		return text, nil
+	}
+	fileHeader, err := c.FormFile(key)
+	if err != nil {
+		return "", err
+	}
+	file, err := fileHeader.Open()
+	if err != nil {
+		return "", err
+	}
+	b, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func InitGinEngine(lc fx.Lifecycle, tp trace.TracerProvider, otelpromExporter *otelprom.Exporter) *gin.Engine {

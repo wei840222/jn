@@ -1,5 +1,8 @@
 # jn
 
+## Try it for free !
+https://kn.weii.dev/default/jn
+
 ## Why name jn ?
 **J**SON Functio**n**s, **J**SO**N**
 
@@ -22,18 +25,32 @@ kubectl apply -k .tekton
 
 ## Example Usage
 ```bash
-curl -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/invoke/js \
+# json
+curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
-    "script": "data.flat().map(x => x * 2).filter(x => x > 5)",
-    "data": [
-        [1,2,3,4,5],
-        [6,7,8,9]
-    ]
-}'
+    "script": "data.map(x => x * 2)",
+    "data": [1,2]
+}' | jq
+
+# or martipart form
+echo 'data.map(x => x * 2)' > script.js
+curl -s -X POST -F 'script="data.map(x => x * 2)"' -F 'data="[1,2]"' http://localhost:8080/invoke/js | jq
+
+# or martipart form file
+echo 'data.map(x => x * 2)' > script.js
+echo '[1,2]' > data.json
+curl -s -X POST -F 'script=@"./script.js"' -F 'data=@"./data.json"' http://localhost:8080/invoke/js | jq
+
+# or martipart form text and file
+echo 'data.map(x => x * 2)' > script.js
+curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' http://localhost:8080/invoke/js | jq
 ```
 ```json
 {
-    "result": [6,8,10,12,14,16,18]
+  "result": [
+    2,
+    4
+  ]
 }
 ```
 
@@ -41,44 +58,44 @@ curl -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/
 ### Lodash
 https://lodash.com
 ```bash
-curl -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/invoke/js \
+curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
     "script":"_.defaults({ '\''a'\'': 1 }, { '\''a'\'': 3, '\''b'\'': 2 });"
-}'
+}' | jq
 ```
 ```json
 {
-    "result": {
-        "a": 1,
-        "b": 2
-    }
+  "result": {
+    "a": 1,
+    "b": 2
+  }
 }
 ```
 
 ### Moment.js
 https://momentjs.com
 ```bash
-curl -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/invoke/js \
+curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
     "script":"moment().format('\''MMMM Do YYYY, h:mm:ss a'\'')"
-}'
+}' | jq
 ```
 ```json
 {
-    "result": "October 19th 2022, 3:57:56 pm"
+  "result": "December 10th 2022, 4:34:42 am"
 }
 ```
 
 ### base64.js
 https://github.com/mathiasbynens/base64
 ```bash
-curl -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/invoke/js \
+curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
     "script": "base64.encode('\''abc'\'')"
-}'
+}' | jq
 ```
 ```json
 {
-    "result": "YWJj"
+  "result": "YWJj"
 }
 ```
