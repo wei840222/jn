@@ -28,8 +28,8 @@ kubectl apply -k .tekton
 # json
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
-    "script": "data.map(x => x * 2)",
-    "data": [1,2]
+  "script": "data.map(x => x * 2)",
+  "data": [1,2]
 }' | jq
 
 # or martipart form
@@ -60,14 +60,24 @@ https://lodash.com
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
-    "script":"_.defaults({ '\''a'\'': 1 }, { '\''a'\'': 3, '\''b'\'': 2 });"
+  "script": "_.groupBy(data, Math.floor)",
+  "data": [
+    6.1,
+    4.2,
+    6.3
+  ]
 }' | jq
 ```
 ```json
 {
   "result": {
-    "a": 1,
-    "b": 2
+    "4": [
+      4.2
+    ],
+    "6": [
+      6.1,
+      6.3
+    ]
   }
 }
 ```
@@ -77,7 +87,7 @@ https://momentjs.com
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
-    "script":"moment().format('\''MMMM Do YYYY, h:mm:ss a'\'')"
+  "script":"moment().format('\''MMMM Do YYYY, h:mm:ss a'\'')"
 }' | jq
 ```
 ```json
@@ -91,7 +101,7 @@ https://github.com/mathiasbynens/base64
 ```bash
 curl -s -X POST -H 'Content-Type: application/json' http://localhost:8080/invoke/js \
 --data-raw '{
-    "script": "base64.encode('\''abc'\'')"
+  "script": "base64.encode('\''abc'\'')"
 }' | jq
 ```
 ```json

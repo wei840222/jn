@@ -21,7 +21,8 @@ var jslib embed.FS
 
 type jsLibrary struct {
 	name          string
-	script        string
+	source        string
+	script        *v8.UnboundScript
 	compilerCache *v8.CompilerCachedData
 }
 
@@ -103,11 +104,7 @@ func (h *jsHandler) invoke(c *gin.Context) {
 
 	_, sspan = tracer.Start(c, "load javascript library")
 	for _, jslib := range h.jslibs {
-		script, err := h.v8Iso.CompileUnboundScript(jslib.script, jslib.name, v8.CompileOptions{CachedData: jslib.compilerCache})
-		if err != nil {
-			panic(err)
-		}
-		if _, err = script.Run(v8Ctx); err != nil {
+		if _, err := jslib.script.Run(v8Ctx); err != nil {
 			panic(err)
 		}
 		sspan.AddEvent("load " + jslib.name)
@@ -191,7 +188,8 @@ func RegisterJSHandler(lc fx.Lifecycle, e *gin.Engine) error {
 					script.Run(v8Ctx)
 					h.jslibs = append(h.jslibs, &jsLibrary{
 						name:          info.Name(),
-						script:        string(b),
+						source:        string(b),
+						script:        script,
 						compilerCache: script.CreateCodeCache(),
 					})
 				}
