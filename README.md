@@ -4,26 +4,35 @@
 https://kn.weii.dev/default/jn
 
 ## Why name jn ?
-**J**SON Functio**n**s, **J**SO**N**
+**"J"**SON Functio**"n"**s, **"J"**SO**"N"**
 
-A server run provide many function as RESTful API for processing JSON input and output the results.
+A server provide many function as RESTful API for processing JSON input and output the results.
 
-## How to build?
+## How to ?
+
+### Install development tools
+```bash
+go install github.com/silenceper/gowatch@latest
+go install github.com/swaggo/swag/cmd/swag@latest
+```
+
+### Build
 ```bash
 pack build --builder=gcr.io/buildpacks/builder:v1 --publish wei840222/jn:2
 ```
 
-## How to deploy?
+### Deploy
 ```bash
 kn ksvc apply --annotation=prometheus.io/scrape=true --annotation=prometheus.io/port=2222 --annotation=instrumentation.opentelemetry.io/inject-sdk=true --image=wei840222/jn:2 jn
 ```
 
-## How to deploy by tekton?
+### Deploy by tekton
 ```bash
 kubectl apply -k .tekton
 ```
 
 ## Example Usage
+
 ### js
 ```bash
 # json
@@ -56,6 +65,7 @@ curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' http://localhost:80
 ```
 
 #### Embaded some JavaScript Libraries
+
 ##### Lodash
 https://lodash.com
 ```bash

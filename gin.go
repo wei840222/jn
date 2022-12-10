@@ -69,7 +69,7 @@ func InitGinEngine(lc fx.Lifecycle, _ trace.TracerProvider, _ metric.MeterProvid
 		gin.Recovery(),
 	)
 
-	e.GET("/", func(c *gin.Context) {
+	e.GET("/health", func(c *gin.Context) {
 		c.String(http.StatusOK, "OK")
 	})
 

@@ -45,6 +45,31 @@ func (h *jsHandler) allowLimit() func() {
 	}
 }
 
+type jsInvokeReq struct {
+	Script string `json:"script" binding:"required" validate:"required" example:"_.camelCase(data)"`
+	Data   any    `json:"data" validate:"optional" swaggertype:"string,object,array" example:"test_data"`
+}
+
+type jsInvokeRes struct {
+	Result any `json:"result" validate:"required" swaggertype:"string,object,array" example:"testData"`
+}
+
+type jsInvokeErrRes struct {
+	Error      string `json:"error" validate:"required"`
+	Source     string `json:"source,omitempty" validate:"optional"`
+	StackTrace string `json:"stackTrace,omitempty" validate:"optional"`
+}
+
+// @Summary      Invoke JavaScript
+// @Description  Run JavaScript with optional data input
+// @Tags         Invoke
+// @Accept       json
+// @Produce      json
+// @Param        body body jsInvokeReq true "request body"
+// @Success      200 {object} jsInvokeRes
+// @Failure      400 {object} jsInvokeErrRes
+// @Failure      422 {object} jsInvokeErrRes
+// @Router       /invoke/js [post]
 func (h *jsHandler) invoke(c *gin.Context) {
 	span := trace.SpanFromContext(c)
 
@@ -54,15 +79,12 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	defer h.jsInvokeConcurrencyMetrics.Add(c, -1)
 	span.AddEvent("allowLimit", trace.WithAttributes(attribute.Int("concurrency", len(h.cl))))
 
-	var req struct {
-		Script string `json:"script" binding:"required"`
-		Data   any    `json:"data"`
-	}
+	var req jsInvokeReq
 	if strings.Contains(strings.ToLower(string(c.ContentType())), "application/json") {
 		if err := c.ShouldBind(&req); err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
+			c.AbortWithStatusJSON(http.StatusBadRequest, &jsInvokeErrRes{
+				Error: err.Error(),
 			})
 			return
 		}
@@ -71,8 +93,8 @@ func (h *jsHandler) invoke(c *gin.Context) {
 		script, err := readMultipartTextOrFile(c, "script")
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusBadRequest, gin.H{
-				"error": err.Error(),
+			c.AbortWithStatusJSON(http.StatusBadRequest, &jsInvokeErrRes{
+				Error: err.Error(),
 			})
 			return
 		}
@@ -122,10 +144,10 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	if err != nil {
 		if jsErr, ok := err.(*v8.JSError); ok {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusUnprocessableEntity, gin.H{
-				"error":      jsErr.Message,
-				"source":     jsErr.Location,
-				"stackTrace": jsErr.StackTrace,
+			c.AbortWithStatusJSON(http.StatusUnprocessableEntity, &jsInvokeErrRes{
+				Error:      jsErr.Message,
+				Source:     jsErr.Location,
+				StackTrace: jsErr.StackTrace,
 			})
 			sspan.RecordError(err, trace.WithAttributes(
 				attribute.String("error", jsErr.Message),
@@ -139,21 +161,21 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	sspan.End()
 
 	if result.IsNullOrUndefined() {
-		c.JSON(http.StatusUnprocessableEntity, gin.H{
-			"error": "The output of script is null or undefined, please make sure that the last line of your script contains the variables to be output.",
+		c.JSON(http.StatusUnprocessableEntity, &jsInvokeErrRes{
+			Error: "The output of script is null or undefined, please make sure that the last line of your script contains the variables to be output.",
 		})
 		return
 	}
 
 	if result.IsObject() {
-		c.JSON(http.StatusOK, gin.H{
-			"result": result.Object(),
+		c.JSON(http.StatusOK, &jsInvokeRes{
+			Result: result.Object(),
 		})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"result": result.String(),
+	c.JSON(http.StatusOK, &jsInvokeRes{
+		Result: result.String(),
 	})
 }
 
