@@ -1,0 +1,185 @@
+openapi: 3.0.0
+info:
+  title: jn
+  description: A server provide many function as RESTful API for processing JSON input and output the results.
+  version: 1.0.0
+  contact:
+    email: wei840222@gmail.com
+  license:
+    name: MIT
+    url: https://github.com/wei840222/jn/blob/main/LICENSE
+servers:
+- url: https://kn.weii.dev/default/jn
+  description: Production
+- url: http://localhost:8080
+  description: Local
+tags:
+- name: js
+  description: Using JavaScript for processing JSON.
+paths:
+  /js/invoke:
+    post:
+      tags:
+      - js
+      summary: Invoke JavaScript
+      operationId: jsInvoke
+      description: |
+        **Run JavaScript with optional data input.**  
+        Example Usage for request body mix in different content types.  
+        *request*
+        ```bash
+        # json
+        curl -s -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/js/invoke \
+        --data-raw '{
+          "script": "data.map(x => x * 2)",
+          "data": [1,2]
+        }' | jq
+
+        # or martipart form
+        echo 'data.map(x => x * 2)' > script.js
+        curl -s -X POST -F 'script="data.map(x => x * 2)"' -F 'data="[1,2]"' https://kn.weii.dev/default/jn/js/invoke | jq
+
+        # or martipart form file
+        echo 'data.map(x => x * 2)' > script.js
+        echo '[1,2]' > data.json
+        curl -s -X POST -F 'script=@"./script.js"' -F 'data=@"./data.json"' https://kn.weii.dev/default/jn/js/invoke | jq
+
+        # or martipart form text and file
+        echo 'data.map(x => x * 2)' > script.js
+        curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' https://kn.weii.dev/default/jn/js/invoke | jq
+        ```
+        *response*
+        ```json
+        {
+          "result": [
+            2,
+            4
+          ]
+        }
+        ```
+
+        Embaded common JavaScript libraries, see examples below for more information.
+        * [Lodash](https://lodash.com)
+        * [Moment.js](https://momentjs.com)
+        * [base64.js](https://github.com/mathiasbynens/base64)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+              - script
+              properties:
+                script:
+                  type: string
+                data:
+                  oneOf:
+                  - type: string
+                  - type: number
+                  - type: integer
+                  - type: boolean
+                  - type: array
+                    items: {}
+                  - type: object
+            examples:
+              Pure JavaScript:
+                value:
+                  script: "data.map(x => x * 2)"
+                  data:
+                  - 1
+                  - 2
+              Lodash:
+                value:
+                  script: "_.groupBy(data, Math.floor)"
+                  data:
+                  - 6.1
+                  - 4.2
+                  - 6.3
+              Moment.js:
+                value:
+                  script: "moment().format('MMMM Do YYYY, h:mm:ss a')"
+              base64.js:
+                value:
+                  script: "base64.encode('abc')"
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - script
+              properties:
+                script:
+                  type: string
+                  format: binary
+                data:
+                  type: string
+                  format: binary
+      responses:
+        200:
+          description: Invoke success.
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                - result
+                properties:
+                  result:
+                    oneOf:
+                    - type: string
+                    - type: number
+                    - type: integer
+                    - type: boolean
+                    - type: array
+                      items: {}
+                    - type: object
+              examples:
+                Pure JavaScript:
+                  value:
+                    result:
+                    - 2
+                    - 4
+                Lodash:
+                  value:
+                    result:
+                      4:
+                      - 4.2
+                      6:
+                      - 6.1
+                      - 6.3
+                Moment.js:
+                  value:
+                    result: "December 10th 2022, 4:34:42 am"
+                base64.js:
+                  value:
+                    result: YWJj
+        400:
+          description: Request body format miss match.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/jsInvokeErrRes"
+              example:
+                error: "Key: 'jsInvokeReq.Script' Error:Field validation for 'Script' failed on the 'required' tag"
+        422:
+          description: Script in request body can't run.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/jsInvokeErrRes"
+              example:
+                error: "SyntaxError: Unexpected identifier"
+                source: "script.js:1:28"
+                stackTrace: "SyntaxError: Unexpected identifier"
+components:
+  schemas:
+    jsInvokeErrRes:
+      type: object
+      required:
+      - error
+      properties:
+        error:
+          type: string
+        source:
+          type: string
+        stackTrace:
+          type: string

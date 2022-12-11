@@ -46,30 +46,20 @@ func (h *jsHandler) allowLimit() func() {
 }
 
 type jsInvokeReq struct {
-	Script string `json:"script" binding:"required" validate:"required" example:"_.camelCase(data)"`
-	Data   any    `json:"data" validate:"optional" swaggertype:"string,object,array" example:"test_data"`
+	Script string `json:"script" binding:"required"`
+	Data   any    `json:"data"`
 }
 
 type jsInvokeRes struct {
-	Result any `json:"result" validate:"required" swaggertype:"string,object,array" example:"testData"`
+	Result any `json:"result"`
 }
 
 type jsInvokeErrRes struct {
-	Error      string `json:"error" validate:"required"`
-	Source     string `json:"source,omitempty" validate:"optional"`
-	StackTrace string `json:"stackTrace,omitempty" validate:"optional"`
+	Error      string `json:"error"`
+	Source     string `json:"source,omitempty"`
+	StackTrace string `json:"stackTrace,omitempty"`
 }
 
-// @Summary      Invoke JavaScript
-// @Description  Run JavaScript with optional data input
-// @Tags         Invoke
-// @Accept       json
-// @Produce      json
-// @Param        body body jsInvokeReq true "request body"
-// @Success      200 {object} jsInvokeRes
-// @Failure      400 {object} jsInvokeErrRes
-// @Failure      422 {object} jsInvokeErrRes
-// @Router       /invoke/js [post]
 func (h *jsHandler) invoke(c *gin.Context) {
 	span := trace.SpanFromContext(c)
 
@@ -194,7 +184,10 @@ func RegisterJSHandler(lc fx.Lifecycle, e *gin.Engine) error {
 		jsInvokeConcurrencyMetrics: jsInvokeConcurrencyUpDownCounter,
 	}
 
-	e.POST("/invoke/js", h.invoke)
+	js := e.Group("/js")
+	{
+		js.POST("/invoke", h.invoke)
+	}
 
 	lc.Append(fx.Hook{
 		OnStart: func(context.Context) error {
