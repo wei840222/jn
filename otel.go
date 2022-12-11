@@ -51,7 +51,7 @@ func InitTracerProvider(lc fx.Lifecycle) (trace.TracerProvider, error) {
 		sdktrace.WithResource(resource.NewWithAttributes(
 			semconv.SchemaURL,
 			semconv.ServiceNameKey.String("jn"),
-			semconv.ServiceVersionKey.String("0.0.1"),
+			semconv.ServiceVersionKey.String("1.0.0"),
 		)),
 	)
 
