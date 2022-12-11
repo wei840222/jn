@@ -29,11 +29,7 @@ paths:
         *request*
         ```bash
         # json
-        curl -s -X POST -H 'Content-Type: application/json' https://kn.weii.dev/default/jn/js/invoke \
-        --data-raw '{
-          "script": "data.map(x => x * 2)",
-          "data": [1,2]
-        }' | jq
+        curl -s -X POST -H 'Content-Type: application/json' -d '{"script":"data.map(x => x * 2)","data":[1,2]}' https://kn.weii.dev/default/jn/js/invoke | jq
 
         # or martipart form
         echo 'data.map(x => x * 2)' > script.js
