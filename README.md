@@ -1,7 +1,7 @@
 # jn
 
 ## Try it for free !
-https://kn.weii.dev/default/jn
+https://knative.weii.dev/default/jn
 
 ## Why name jn ?
 "J"SON Functio"n"s, "J"SO"N"

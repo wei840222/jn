@@ -9,7 +9,7 @@ info:
     name: MIT
     url: https://github.com/wei840222/jn/blob/main/LICENSE
 servers:
-- url: https://kn.weii.dev/default/jn
+- url: https://knative.weii.dev/default/jn
   description: Production
 - url: http://localhost:8080
   description: Local
@@ -29,20 +29,20 @@ paths:
         *request*
         ```bash
         # json
-        curl -s -X POST -H 'Content-Type: application/json' -d '{"script":"data.map(x => x * 2)","data":[1,2]}' https://kn.weii.dev/default/jn/js/invoke | jq
+        curl -s -X POST -H 'Content-Type: application/json' -d '{"script":"data.map(x => x * 2)","data":[1,2]}' https://knative.weii.dev/default/jn/js/invoke | jq
 
         # or martipart form
         echo 'data.map(x => x * 2)' > script.js
-        curl -s -X POST -F 'script="data.map(x => x * 2)"' -F 'data="[1,2]"' https://kn.weii.dev/default/jn/js/invoke | jq
+        curl -s -X POST -F 'script="data.map(x => x * 2)"' -F 'data="[1,2]"' https://knative.weii.dev/default/jn/js/invoke | jq
 
         # or martipart form file
         echo 'data.map(x => x * 2)' > script.js
         echo '[1,2]' > data.json
-        curl -s -X POST -F 'script=@"./script.js"' -F 'data=@"./data.json"' https://kn.weii.dev/default/jn/js/invoke | jq
+        curl -s -X POST -F 'script=@"./script.js"' -F 'data=@"./data.json"' https://knative.weii.dev/default/jn/js/invoke | jq
 
         # or martipart form text and file
         echo 'data.map(x => x * 2)' > script.js
-        curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' https://kn.weii.dev/default/jn/js/invoke | jq
+        curl -s -X POST -F 'script=@"./script.js"' -F 'data="[1,2]"' https://knative.weii.dev/default/jn/js/invoke | jq
         ```
         *response*
         ```json
