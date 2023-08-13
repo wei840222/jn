@@ -11,8 +11,6 @@ var (
 
 func main() {
 	fx.New(
-		fx.Provide(InitMeterProvider),
-		fx.Provide(InitTracerProvider),
 		fx.Provide(InitGinEngine),
 		fx.Invoke(RegisterRapiDocHandler),
 		fx.Invoke(RegisterJSHandler),
