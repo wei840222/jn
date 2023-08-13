@@ -10,8 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric/instrument"
-	"go.opentelemetry.io/otel/metric/instrument/syncint64"
+	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/trace"
 	"go.uber.org/fx"
 	"go.uber.org/ratelimit"
@@ -34,7 +33,7 @@ type jsHandler struct {
 	cl     chan struct{}
 	rl     ratelimit.Limiter
 
-	jsInvokeConcurrencyMetrics syncint64.UpDownCounter
+	jsInvokeConcurrencyMetrics metric.Int64UpDownCounter
 }
 
 func (h *jsHandler) allowLimit() func() {
@@ -170,7 +169,7 @@ func (h *jsHandler) invoke(c *gin.Context) {
 }
 
 func RegisterJSHandler(lc fx.Lifecycle, e *gin.Engine) error {
-	jsInvokeConcurrencyUpDownCounter, err := meter.SyncInt64().UpDownCounter("js_invoke_concurrency", instrument.WithDescription("Current concurrency of JavaScript invocation."))
+	jsInvokeConcurrencyUpDownCounter, err := meter.Int64UpDownCounter("js_invoke_concurrency", metric.WithDescription("Current concurrency of JavaScript invocation."))
 	if err != nil {
 		return err
 	}
