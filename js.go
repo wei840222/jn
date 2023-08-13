@@ -98,10 +98,12 @@ type jsInvokeReq struct {
 }
 
 type jsInvokeRes struct {
-	Result any `json:"result"`
+	Result any      `json:"result,omitempty"`
+	Logs   []string `json:"logs,omitempty"`
 }
 
 type jsInvokeErrRes struct {
+	jsInvokeRes
 	Error      string `json:"error"`
 	Source     string `json:"source,omitempty"`
 	StackTrace string `json:"stackTrace,omitempty"`
@@ -133,8 +135,8 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	v8goCtx, close := h.generateV8GoContext()
 	defer close()
 
+	global := v8goCtx.Global()
 	if req.Data != nil {
-		global := v8goCtx.Global()
 		if s, ok := req.Data.(string); ok {
 			if err := global.Set("data", s); err != nil {
 				panic(err)
@@ -151,6 +153,32 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	}
 
 	if _, err := v8goCtx.RunScript("try { data = JSON.parse(data) } catch {}", "parse.js"); err != nil {
+		panic(err)
+	}
+
+	var logs []string
+	console := v8go.NewObjectTemplate(v8goCtx.Isolate())
+	console.Set("log", v8go.NewFunctionTemplate(v8goCtx.Isolate(), func(info *v8go.FunctionCallbackInfo) *v8go.Value {
+		var args []string
+		for _, arg := range info.Args() {
+			switch {
+			case arg.IsObject(), arg.IsArray():
+				b, _ := json.Marshal(arg.Object())
+				args = append(args, string(b))
+			case arg.IsString():
+				args = append(args, "'"+arg.String()+"'")
+			default:
+				args = append(args, arg.String())
+			}
+		}
+		logs = append(logs, strings.Join(args, " "))
+		return nil
+	}))
+	consoleO, err := console.NewInstance(v8goCtx)
+	if err != nil {
+		panic(err)
+	}
+	if err := global.Set("console", consoleO); err != nil {
 		panic(err)
 	}
 
@@ -171,7 +199,12 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	if result.IsNullOrUndefined() {
 		c.Error(errors.New("the output of script is null or undefined"))
 		c.AbortWithStatusJSON(http.StatusUnprocessableEntity, &jsInvokeErrRes{
-			Error: "The output of script is null or undefined, please make sure that the last line of your script contains the variables to be output.",
+			jsInvokeRes: jsInvokeRes{
+				Logs: logs,
+			},
+			Error:      "The output of script is null or undefined, please make sure that the last line of your script contains the variables to be output.",
+			Source:     "",
+			StackTrace: "",
 		})
 		return
 	}
@@ -179,12 +212,14 @@ func (h *jsHandler) invoke(c *gin.Context) {
 	if result.IsObject() {
 		c.JSON(http.StatusOK, &jsInvokeRes{
 			Result: result.Object(),
+			Logs:   logs,
 		})
 		return
 	}
 
 	c.JSON(http.StatusOK, &jsInvokeRes{
 		Result: result.String(),
+		Logs:   logs,
 	})
 }
 
