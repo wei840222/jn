@@ -46,7 +46,7 @@ func (h *jsHandler) loadJSLibrary() error {
 			return nil
 		}
 		if strings.HasSuffix(path, ".js") {
-			b, err := os.ReadFile(path)
+			b, err := jslib.ReadFile(path)
 			if err != nil {
 				return err
 			}
