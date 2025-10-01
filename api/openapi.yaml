@@ -9,6 +9,8 @@ info:
     name: MIT
     url: https://github.com/wei840222/jn/blob/main/LICENSE
 servers:
+  - url: https://jn.weii.dev
+    description: Public
   - url: http://localhost:8080
     description: Local
 tags:
