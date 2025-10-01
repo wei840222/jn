@@ -14,9 +14,19 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
+# Air
+tmp
+
 # Dependency directories (remove the comment below to include it)
 # vendor/
 
 # Go workspace file
 go.work
 go.work.sum
+
+.gitignore
+.dockerignore
+.gitea
+Dockerfile
+LICENSE
+README.md
